@@ -46,7 +46,7 @@ VALUES
   ('A', '2021-01-07'),
   ('B', '2021-01-09')
 
---Case Study Quesries
+--Case Study Queries
 
 --What is the total number amount spent at the resraurant?
 
@@ -116,4 +116,101 @@ group by sales.customer_id,menu.product_name
 A	ramen
 B	sushi
 C	ramen
+
+--Which item was purchased first by the customer after they became a member?
+
+WITH cte AS (SELECT ROW_NUMBER () OVER (PARTITION BY members.customer_id ORDER BY sales.order_date) AS row_id, 
+	sales.customer_id, sales.order_date, menu.product_name 
+	FROM sales 
+    INNER JOIN menu
+    ON sales.product_id = menu.product_id
+    INNER JOIN dbo.members
+    ON members.customer_id = sales.customer_id
+	WHERE sales.order_date >= .members.join_date)
+
+	SELECT * 
+	FROM cte 
+	WHERE row_id = 1
+
+A	          curry
+B		      sushi
+
+--Which item was purchased just before the customer became a member?
+
+WITH cte AS (SELECT ROW_NUMBER () OVER (PARTITION BY members.customer_id ORDER BY sales.order_date) AS row_id, 
+	sales.customer_id, sales.order_date, menu.product_name 
+	FROM sales 
+    INNER JOIN menu
+    ON sales.product_id = menu.product_id
+    INNER JOIN members
+    ON members.customer_id = sales.customer_id
+	WHERE sales.order_date < .members.join_date)
+
+	SELECT * 
+	FROM cte 
+	WHERE row_id = 1
+
+A	          sushi
+B		      curry
+
+
+--What is the total items and amount spent for each member before they became a member?
+
+Select sales.customer_id, count(menu.product_name) as total_items, sum(menu.price) as amount_spent
+	FROM sales 
+    INNER JOIN menu
+    ON sales.product_id = menu.product_id
+    INNER JOIN members
+    ON members.customer_id = sales.customer_id
+	WHERE sales.order_date < members.join_date
+	GROUP BY sales.customer_id
+
+A	2	25
+B	3	40
+
+--If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+
+SELECT sales.customer_id,
+	SUM(
+	CASE
+	WHEN menu.product_name = 'sushi' THEN 20 * price
+	ELSE 10 * PRICE
+	END
+	) AS Points
+	FROM sales
+	JOIN menu
+	ON sales.product_id = menu.product_id
+	GROUP BY
+	sales.customer_id
+	ORDER BY
+	sales.customer_id
+
+A	860
+B	940
+C	360
+
+--In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+
+SELECT
+	sales.customer_id,
+	SUM(
+		CASE
+  		WHEN menu.product_name = 'sushi' THEN 20 * price
+		WHEN order_date BETWEEN '2021-01-07' AND '2021-01-14' THEN 20 * price
+  		ELSE 10 * PRICE
+		END
+	) AS Points
+	FROM sales
+    	JOIN dbo.menu
+    	ON sales.product_id = menu.product_id
+    	JOIN members
+    	ON members.customer_id = .sales.customer_id
+	GROUP BY
+	sales.customer_id
+	ORDER BY
+	sales.customer_id
+
+	
+A	1370
+B	940
 
